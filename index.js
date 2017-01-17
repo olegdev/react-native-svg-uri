@@ -13,6 +13,7 @@ import Svg,{
     Line,
     Path,
     Polygon,
+    Text,
     Polyline,
     Rect,
     Symbol,
@@ -22,25 +23,29 @@ import Svg,{
 } from 'react-native-svg';
 
 const ACEPTED_SVG_ELEMENTS = {'svg':true, 'g':true, 'circle':true, 'path':true,
-                              'rect':true, 'linearGradient':true, 'radialGradient':true, 'stop':true};
+                              'rect':true, 'linearGradient':true, 'radialGradient':true, 'stop':true, 'polygon':true, 'text': true};
 
 
 // Attributes from SVG elements that are mapped directly.
 const SVG_ATTS = {'viewBox':true};
-const G_ATTS = {'id':true};
-const CIRCLE_ATTS = {'cx':true, 'cy':true, 'r':true, 'fill':true, 'stroke':true};
+const G_ATTS = {'id':true, fillOpacity: true};
+const CIRCLE_ATTS = {'cx':true, 'cy':true, 'r':true, 'fill':true, stroke: true};
+const POLYGON_ATTS = {'fill':true, 'points': true};
+const TEXT_ATTS = {'fill':true, 'fontSize': true};
 const PATH_ATTS = {'d':true, 'fill':true, 'stroke':true};
-const RECT_ATTS = {'width':true, 'height':true, 'fill':true, 'stroke':true};
+const RECT_ATTS = {'width':true, 'height':true, x: true, y: true, fill: true};
 const LINEARG_ATTS = {'id':true, 'x1':true, 'y1':true, 'x2':true, 'y2':true};
 const RADIALG_ATTS = {'id':true, 'cx':true, 'cy':true, 'r':true};
 const STOP_ATTS = {'offset':true};
 
 // Attributes that have a transformation of value
 const SVG_ATTS_TRANSFORM = {'x':true, 'y':true, 'height':true, 'width':true }; //'viewBox':true
-const G_ATTS_TRANSFORM = {};
-const CIRCLE_ATTS_TRANSFORM = {'style':true};
+const G_ATTS_TRANSFORM = {opacity: true};
+const CIRCLE_ATTS_TRANSFORM = {'style':true, 'stroke': true, 'stroke-width': true};
+const POLYGON_ATTS_TRANSFORM = {'style':true};
+const TEXT_ATTS_TRANSFORM = {'style':true};
 const PATH_ATTS_TRANSFORM = {'style':true};
-const RECT_ATTS_TRANSFORM = {'style':true};
+const RECT_ATTS_TRANSFORM = {'style':true, 'opacity': true};
 const LINEARG_ATTS_TRANSFORM = {};
 const RADIALG_ATTS_TRANSFORM = {}; // Its not working
 const STOP_ATTS_TRANSFORM = {'style':true};
@@ -49,6 +54,8 @@ const STOP_ATTS_TRANSFORM = {'style':true};
 const ATTS_TRANSFORMED_NAMES={'stroke-linejoin':'strokeLinejoin',
                               'stroke-linecap':'strokeLinecap',
                               'stroke-width':'strokeWidth',
+                              'opacity': 'fillOpacity',
+                              'font-size': "fontSize",
                             //  'stroke-miterlimit':'strokeMiterlimit',
                               };
 
@@ -56,12 +63,13 @@ let ind = 0;
 
 class SvgUri extends Component{
 
-	constructor(props){
-		super(props);
+  constructor(props){
+    super(props);
 
-    this.state = {svgXmlData: props.svgXmlData};
+    this.state = {svgXmlData:null};
 
     this.createSVGElement     = this.createSVGElement.bind(this);
+    this.transformSVGAtt      = this.transformSVGAtt.bind(this);
     this.obtainComponentAtts  = this.obtainComponentAtts.bind(this);
     this.inspectNode          = this.inspectNode.bind(this);
     this.fecthSVGData         = this.fecthSVGData.bind(this);
@@ -71,17 +79,8 @@ class SvgUri extends Component{
         const source = resolveAssetSource(props.source) || {};
         this.fecthSVGData(source.uri);
     }
-	}
+  }
 
-  componentWillReceiveProps (nextProps){
-    if (nextProps.source) {
-        const source = resolveAssetSource(nextProps.source) || {};
-        const oldSource = resolveAssetSource(this.props.source) || {};
-        if(source.uri !== oldSource.uri){
-            this.fecthSVGData(source.uri);
-        }
-    }
-  } 
 
   async fecthSVGData(uri){
      try {
@@ -116,6 +115,13 @@ class SvgUri extends Component{
         case 'circle':
              componentAtts = this.obtainComponentAtts(node, CIRCLE_ATTS, CIRCLE_ATTS_TRANSFORM);
             return <Circle key={i} {...componentAtts}>{childs}</Circle>;
+        case 'polygon':
+             componentAtts = this.obtainComponentAtts(node, POLYGON_ATTS, POLYGON_ATTS_TRANSFORM);
+            return <Polygon key={i} {...componentAtts}>{childs}</Polygon>;
+        // case 'text':
+        //      componentAtts = this.obtainComponentAtts(node, TEXT_ATTS, TEXT_ATTS_TRANSFORM);
+        //      console.log(componentAtts);
+        //     return <Text key={i} {...componentAtts}>{childs}</Text>;
         case 'rect':
              componentAtts = this.obtainComponentAtts(node, RECT_ATTS, RECT_ATTS_TRANSFORM);
             return <Rect key={i} {...componentAtts}>{childs}</Rect>;
@@ -130,28 +136,33 @@ class SvgUri extends Component{
             return <Stop key={i} {...componentAtts}>{childs}</Stop>;
         default:
           return null;
+          break;
         }
   }
 
-  obtainComponentAtts({attributes}, enabledAttributes, transformAttributes) {
-      let validAttributes = {};
-
-      Array.from(attributes).forEach(({nodeName, nodeValue}) => {
-          if (nodeName in transformAttributes) {
-            Object.assign(validAttributes, this.transformSVGAtt(nodeName, nodeValue));
+  obtainComponentAtts(node, ATTS_ENABLED, ATTS_TRANSFORM){
+      let componentAtts = {};
+      for (let i = 0; i < node.attributes.length; i++){
+          let att = node.attributes[i];
+          if (att.nodeName in ATTS_TRANSFORM){
+              att = this.transformSVGAtt(node.nodeName, att.nodeName, att.nodeValue);
+              componentAtts = Object.assign({}, componentAtts, att);
+          }else{
+              if (att.nodeName in ATTS_TRANSFORMED_NAMES){
+                componentAtts[ATTS_TRANSFORMED_NAMES[att.nodeName]] = att.nodeValue;
+              }else{
+                  if (att.nodeName in ATTS_ENABLED){ // Valida que el atributo sea mapeable
+                      componentAtts[att.nodeName] = att.nodeValue;
+                  }else{
+                      ;
+                  }
+              }
           }
-          else if (nodeName in ATTS_TRANSFORMED_NAMES) {
-            validAttributes[ATTS_TRANSFORMED_NAMES[nodeName]] = nodeValue;
-          }
-          else if (nodeName in enabledAttributes) {
-            validAttributes[nodeName] = this.props.fill && nodeName === 'fill' ? this.props.fill : nodeValue;
-          }
-      });
-
-      return validAttributes;
+      }
+      return componentAtts;
   }
 
-  transformSVGAtt(attName, attValue) {
+  transformSVGAtt(component, attName, attValue){
       if (attName == 'style'){
           let styleAtts = attValue.split(';');
           let newAtts = {};
@@ -200,7 +211,7 @@ class SvgUri extends Component{
       return element;
   }
 
-	render(){
+  render(){
     try{
         if (this.state.svgXmlData == null)
             return null;
@@ -220,11 +231,7 @@ class SvgUri extends Component{
       console.error("ERROR SVG", e);
       return null;
     }
-	}
-}
-
-SvgUri.propTypes = {
-  fill: PropTypes.string,
+  }
 }
 
 module.exports = SvgUri;
