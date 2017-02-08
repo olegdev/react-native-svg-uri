@@ -4,6 +4,8 @@ import {View} from 'react-native';
 import xmldom from 'xmldom'; // Dependencie
 import resolveAssetSource from 'react-native/Libraries/Image/resolveAssetSource';
 
+import svgImagesData from '../../images/svgImagesData'
+
 import Svg,{
     Circle,
     Ellipse,
@@ -76,8 +78,12 @@ class SvgUri extends Component{
 
     // Gets the image data from an URL or a static file
     if (props.source) {
-        const source = resolveAssetSource(props.source) || {};
-        this.fecthSVGData(source.uri);
+        if (typeof props.source == 'string' && props.source.indexOf('.//') === 0) {
+          this.state.svgXmlData = svgImagesData[props.source];
+        } else {
+          const source = resolveAssetSource(props.source) || {};
+          this.fecthSVGData(source.uri);
+        }
     }
   }
 
